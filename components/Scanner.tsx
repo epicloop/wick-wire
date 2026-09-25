@@ -483,6 +483,11 @@ function Detail(props: { r: TickerReport; price: number | null; gap: number | nu
       <div style={card}>
         <div style={label}>WHY IT MOVED</div>
         <div style={{ fontSize: 22, lineHeight: 1.35, fontWeight: 600, textWrap: "pretty" }}>{r.reason ?? <span style={{ color: K.DIM }}>Explanation unavailable right now.</span>}</div>
+        {r.scoredAt && r.scoredGapPct != null && r.gapPct != null && Math.abs(r.scoredGapPct - r.gapPct) >= 0.05 && (
+          <div style={{ fontSize: 12, color: K.DIM }}>
+            Written {new Date(r.scoredAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} ET, when the gap was {pct(r.scoredGapPct, 2)}. It re-scores when the gap moves ≥ 0.5 pts.
+          </div>
+        )}
         {d && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", height: 10, background: K.LINE }}>

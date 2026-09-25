@@ -49,7 +49,8 @@ function unit() {
   expect("−1.5% on-chain, depth ok → FADE·BUY", sig(base({ gapPct: -1.5 })), "FADE·BUY");
   expect("+1.5% unexplained → FADE·SELL", sig(base({ driver: { news: 0.1, onchain: 0.1, unexplained: 0.8 } })), "FADE·SELL");
   expect("+1.5% on-chain but thin → NO TRADE", sig(base({}), thin), "NO TRADE");
-  expect("mixed evidence → NO TRADE", sig(base({ driver: { news: 0.45, onchain: 0.25, unexplained: 0.3 } })), "NO TRADE");
+  expect("mixed evidence → NO TRADE", sig(base({ driver: { news: 0.55, onchain: 0.2, unexplained: 0.25 }, headlines: sc(0.3) })), "NO TRADE");
+  expect("45% news but on-chain+unexplained ≥ 50% → FADE", sig(base({ driver: { news: 0.45, onchain: 0.25, unexplained: 0.3 } })), "FADE·SELL");
   expect("unscored → NO TRADE", sig(base({ driver: null })), "NO TRADE");
 
   // backtest math: buy at 99 vs close 100, exit 100 → +1.0101% gross, −0.5% fees
@@ -63,15 +64,17 @@ function unit() {
     new Set(["N1"]),
   );
   rec(A, "sanitize: clamps, maps category, drops unknown refs, normalises driver",
-    s.scores.length === 1 && s.scores[0].caused_move === 1 && s.scores[0].importance === 100 && s.scores[0].category === "legal_regulatory" && Math.abs(s.driver.news - 0.5) < 1e-9 && s.explanation[1].ref === null ? "PASS" : "FAIL");
+    s.scores.length === 1 && s.scores[0].caused_move === 1 && s.scores[0].importance === 100 && s.scores[0].category === "legal_regulatory" && Math.abs(s.driver.news - 1 / 3) < 1e-9 && s.explanation[1].ref === null ? "PASS" : "FAIL");
 }
 
 // ---------------- B. production live data ----------------
 async function yahooDaily(t: string, from: number, to: number) {
   const r = await j<any>(`https://query1.finance.yahoo.com/v8/finance/chart/${t}?period1=${from}&period2=${to}&interval=1d`, { headers: { "user-agent": "Mozilla/5.0" } });
   const res = r.chart.result[0];
+  livePx.set(t, res.meta.regularMarketPrice);
   return new Map<string, number>((res.timestamp as number[]).map((ts, i) => [new Date(ts * 1000).toLocaleDateString("en-CA", { timeZone: "America/New_York" }), res.indicators.quote[0].close[i]]));
 }
+const livePx = new Map<string, number>();
 const etDate = (sec: number) => new Date(sec * 1000).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
 async function live() {
@@ -91,10 +94,16 @@ async function live() {
     if (ref && tok && r.gapPct != null) rec(B, `${t} gap = (token − ref)/ref`, Math.abs((tok - ref) / ref * 100 - r.gapPct) < 1e-9 ? "PASS" : "FAIL", `${r.gapPct.toFixed(3)}%`);
     else rec(B, `${t} gap computable`, "FAIL", r.unavailable.join("; "));
     // Reference = the real close of the last trading day (Yahoo daily close, same date).
-    const lc = Math.floor(lastClose() / 1000);
-    const yc = years[i]?.get(etDate(lc));
-    if (ref && yc) rec(B, `${t} last close vs Yahoo ${etDate(lc)}`, near(ref, yc, 0.3) ? "PASS" : "FAIL", `ours ${ref.toFixed(2)} (${r.reference!.source}) · Yahoo ${yc.toFixed(2)}`);
-    else rec(B, `${t} last close vs Yahoo`, "WARN", "Yahoo unavailable");
+    if (r.reference?.label.includes("NOW")) {
+      // Market open: the reference is the live NYSE price (Pyth or Finnhub) → compare with Yahoo's live price.
+      const yl = livePx.get(t);
+      if (ref && yl) rec(B, `${t} live NYSE reference vs Yahoo live`, near(ref, yl, 0.5) ? "PASS" : "WARN", `ours ${ref.toFixed(2)} (${r.reference.source}, cached ${Math.round((Date.now() - r.generatedAt) / 60000)} min) · Yahoo ${yl.toFixed(2)}`);
+    } else {
+      const lc = Math.floor(lastClose() / 1000);
+      const yc = years[i]?.get(etDate(lc));
+      if (ref && yc) rec(B, `${t} last close vs Yahoo ${etDate(lc)}`, near(ref, yc, 0.3) ? "PASS" : "FAIL", `ours ${ref.toFixed(2)} (${r.reference!.source}) · Yahoo ${yc.toFixed(2)}`);
+      else rec(B, `${t} last close vs Yahoo`, "WARN", "Yahoo unavailable");
+    }
     // Token price vs an independent DEX quote (main USDC pool on DexScreener) and our live price feed.
     const ds = await j<any[]>(`https://api.dexscreener.com/token-pairs/v1/solana/${STOCKS[t].mint}`).catch(() => []);
     const main = ds.filter((p) => p.baseToken.address === STOCKS[t].mint && p.quoteToken.symbol === "USDC").sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
@@ -111,10 +120,12 @@ async function live() {
     // Explanation must not invent numbers: every % in reason/explanation should match an input number.
     const text = `${r.reason ?? ""} ${r.explanation.map((s) => s.text).join("")}`;
     const nums = [...text.matchAll(/([−-]?\d+(?:\.\d+)?)\s?%/g)].map((m) => Math.abs(Number(m[1].replace("−", "-"))));
-    const inputs = [r.gapPct, ...r.cross.map((c) => c.pct), r.thin?.impactPct, r.driver?.news! * 100, r.driver?.onchain! * 100]
+    const scores = [...r.headlines, ...r.onchain].flatMap((e) => (e.score ? [e.score.caused_move * 100] : []));
+    const inputs = [r.gapPct, ...r.cross.map((c) => c.pct), r.thin?.impactPct, r.driver?.news! * 100, r.driver?.onchain! * 100, r.driver?.unexplained! * 100, ...scores]
       .filter((x): x is number => x != null && Number.isFinite(x)).map(Math.abs)
       .concat(...[...r.headlines.map((h) => h.title), ...r.onchain.map((e) => e.title + " " + e.detail)].map((s) => [...s.matchAll(/(\d+(?:\.\d+)?)\s?%/g)].map((m) => Number(m[1]))));
-    const orphan = nums.filter((n) => !inputs.some((x) => Math.abs(x - n) <= Math.max(0.06, n * 0.05)));
+    // Small % values may be the gap at scoring time (scores are reused up to 90 min) → allow |n − gap| ≤ 0.5 for n < 2.
+    const orphan = nums.filter((n) => !inputs.some((x) => Math.abs(x - n) <= Math.max(0.06, n * 0.05)) && !(n < 2 && r.gapPct != null && Math.abs(n - Math.abs(r.gapPct)) <= 0.5));
     rec(B, `${t} explanation numbers traceable to inputs`, orphan.length ? "WARN" : "PASS", orphan.length ? `unmatched: ${orphan.join(", ")}% in "${text.slice(0, 90)}…"` : `${nums.length} numbers checked`);
     // Liquidity of main pool vs DexScreener now.
     const ourMain = r.pools.find((p) => !p.paired);

@@ -14,6 +14,7 @@ import type { CrossRow, Flag, Mode, PricePoint, TickerReport } from "./types";
 
 const RESCORE_MIN = Number(process.env.RESCORE_MINUTES ?? 90);
 const lastScored = new Map<string, { at: number; gap: number; output: ScoreOutput; meta: ScoreMeta & { name: string }; textOf: Map<string, string> }>();
+const scoredMeta = new Map<string, { at: number; gap: number }>(); // hash-cache hits keep their original time
 
 export const LIVE_TTL = 10 * 60_000; // re-gather every 10 min; the LLM only runs when the inputs change (hash cache)
 
@@ -194,7 +195,11 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
   // Live cost guard: reuse this ticker's last scoring for up to RESCORE_MIN unless the gap moved ≥ 1 pt.
   // Scores are carried over by event text; brand-new events stay unscored until the next rescoring.
   const prev = mode === "live" && !opts.force ? lastScored.get(stock.ticker) : undefined;
-  if (prev && gapPct != null && Date.now() - prev.at < RESCORE_MIN * 60_000 && Math.abs(gapPct - prev.gap) < 1) {
+  let scoredAt: number | null = null, scoredGapPct: number | null = null;
+  const sameSide = prev && gapPct != null && (Math.sign(gapPct) === Math.sign(prev.gap) || Math.abs(gapPct) < 0.3);
+  if (prev && gapPct != null && sameSide && Date.now() - prev.at < RESCORE_MIN * 60_000 && Math.abs(gapPct - prev.gap) < 0.5) {
+    scoredAt = prev.at;
+    scoredGapPct = prev.gap;
     const byText = new Map(prev.output.scores.map((sc) => [prev.textOf.get(sc.ref), sc]));
     const newRef = new Map(events.map((e) => [e.text, e.ref]));
     scored = {
@@ -220,10 +225,14 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
         stats.llmCalls++;
         stats.llmCostUsd += r.meta.costUsd;
         stats.llmLatencyMs.push(r.meta.latencyMs);
+        scoredMeta.set(hash, { at: Date.now(), gap: gapPct });
         return { output: r.output, meta: { ...r.meta, name: scorer.name } };
       });
+      const sm = scoredMeta.get(hash);
+      scoredAt = sm?.at ?? Date.now();
+      scoredGapPct = sm?.gap ?? gapPct;
       if (mode === "live" && scored)
-        lastScored.set(stock.ticker, { at: Date.now(), gap: gapPct, output: scored.output, meta: scored.meta, textOf: new Map(events.map((e) => [e.ref, e.text])) });
+        lastScored.set(stock.ticker, { at: scoredAt ?? Date.now(), gap: scoredGapPct ?? gapPct, output: scored.output, meta: scored.meta, textOf: new Map(events.map((e) => [e.ref, e.text])) });
     } catch (e) {
       console.warn(`[pipeline] scoring ${stock.ticker}:`, (e as Error).message);
       unavailable.push(`scoring (${(e as Error).message})`);
@@ -274,6 +283,8 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
     supply: g.supply,
     cross: g.cross,
     scorer: scored?.meta ?? null,
+    scoredAt: scored ? scoredAt : null,
+    scoredGapPct: scored ? scoredGapPct : null,
     unavailable,
     generatedAt: Date.now(),
   };

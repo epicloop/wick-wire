@@ -42,6 +42,8 @@ export type TickerReport = {
   supply: number | null;
   cross: CrossRow[];
   scorer: (ScoreMeta & { name: string }) | null;
+  scoredAt: number | null; // when the explanation/scores were written (ms)
+  scoredGapPct: number | null; // the gap at that moment (numbers in the text refer to it)
   unavailable: string[]; // human-readable list of sources that failed
   generatedAt: number;
 };

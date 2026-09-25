@@ -129,6 +129,11 @@ export default function Detail({ ticker }: { ticker: string }) {
                   <span className="muted">Explanation unavailable: {r.unavailable.join(", ") || "not scored"}.</span>
                 )}
               </div>
+              {r.scoredAt && r.scoredGapPct != null && r.gapPct != null && Math.abs(r.scoredGapPct - r.gapPct) >= 0.05 && (
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Written {new Date(r.scoredAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} ET, when the gap was {fmtPct(r.scoredGapPct, 2)}; re-scored when it moves ≥ 0.5 pts.
+                </div>
+              )}
               {(() => {
                 const sg = signalFor(r, r.mode === "replay" ? replayDepth(r) : liveDepth(r));
                 return (
