@@ -235,7 +235,7 @@ export default function Scanner() {
         const first = lastEvent.current === 0;
         const evs = [...j.events].sort((a, b) => a.id - b.id);
         if (evs.length) lastEvent.current = evs.at(-1)!.id;
-        setFeed((f) => [...evs.reverse(), ...f].slice(0, 40));
+        setFeed((f) => [...evs, ...f].sort((a, b) => b.at - a.at || b.id - a.id).slice(0, 40));
         if (!first)
           for (const e of evs.slice(-4)) {
             const col = e.kind === "NEWS" ? K.AMB : e.kind === "ON-CHAIN" ? K.VIO : e.side === "BUY" ? K.UP : e.side === "SELL" ? K.DN : K.SIG;
