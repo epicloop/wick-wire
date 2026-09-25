@@ -12,6 +12,9 @@ import { stats, takeLlmBudget } from "./stats";
 import { CROSS, CROSS_LABEL, STOCKS, type Stock, type Ticker } from "./stocks";
 import type { CrossRow, Flag, Mode, PricePoint, TickerReport } from "./types";
 
+const RESCORE_MIN = Number(process.env.RESCORE_MINUTES ?? 90);
+const lastScored = new Map<string, { at: number; gap: number; output: ScoreOutput; meta: ScoreMeta & { name: string }; textOf: Map<string, string> }>();
+
 export const LIVE_TTL = 10 * 60_000; // re-gather every 10 min; the LLM only runs when the inputs change (hash cache)
 
 /** Everything the report needs, gathered either live or from history (replay script). */
@@ -188,7 +191,24 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
 
   let scored: { output: ScoreOutput; meta: ScoreMeta & { name: string } } | null = null;
   const unavailable = [...g.unavailable];
-  if (gapPct != null) {
+  // Live cost guard: reuse this ticker's last scoring for up to RESCORE_MIN unless the gap moved ≥ 1 pt.
+  // Scores are carried over by event text; brand-new events stay unscored until the next rescoring.
+  const prev = mode === "live" && !opts.force ? lastScored.get(stock.ticker) : undefined;
+  if (prev && gapPct != null && Date.now() - prev.at < RESCORE_MIN * 60_000 && Math.abs(gapPct - prev.gap) < 1) {
+    const byText = new Map(prev.output.scores.map((sc) => [prev.textOf.get(sc.ref), sc]));
+    const newRef = new Map(events.map((e) => [e.text, e.ref]));
+    scored = {
+      meta: prev.meta,
+      output: {
+        ...prev.output,
+        scores: events.flatMap((e) => {
+          const sc = byText.get(e.text);
+          return sc ? [{ ...sc, ref: e.ref }] : [];
+        }),
+        explanation: prev.output.explanation.map((seg) => ({ text: seg.text, ref: seg.ref ? (newRef.get(prev.textOf.get(seg.ref) ?? "") ?? null) : null })),
+      },
+    };
+  } else if (gapPct != null) {
     const hash = createHash("sha1")
       .update(JSON.stringify({ ...input, movePct: Math.round(gapPct * 2) / 2, fromPrice: null, toPrice: null, events: events.map((e) => [e.ref, e.text]) }))
       .digest("hex");
@@ -202,6 +222,8 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
         stats.llmLatencyMs.push(r.meta.latencyMs);
         return { output: r.output, meta: { ...r.meta, name: scorer.name } };
       });
+      if (mode === "live" && scored)
+        lastScored.set(stock.ticker, { at: Date.now(), gap: gapPct, output: scored.output, meta: scored.meta, textOf: new Map(events.map((e) => [e.ref, e.text])) });
     } catch (e) {
       console.warn(`[pipeline] scoring ${stock.ticker}:`, (e as Error).message);
       unavailable.push(`scoring (${(e as Error).message})`);

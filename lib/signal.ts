@@ -1,6 +1,6 @@
 // Gap signal (paper only, never executes): should you trust this off-hours gap or fade it?
 //  FADE     — |gap| ≥ 1%, the move is mostly on-chain / unexplained, and there is enough depth → expect it to close at the open
-//  RESPECT  — the move is explained by news (driver.news ≥ 0.5 and a headline with caused_move ≥ 0.4) → likely a real repricing
+//  RESPECT  — |gap| ≥ 1% and the move is explained by news (driver.news ≥ 0.5 and a headline with caused_move ≥ 0.4) → likely a real repricing
 //  NO TRADE — gap too small, too thin to trade, or mixed evidence
 import type { TickerReport } from "./types";
 
@@ -16,9 +16,10 @@ export function signalFor(r: TickerReport, depth: { ok: boolean; label: string }
   const gap = r.gapPct;
   if (gap == null) return { signal: "NO TRADE", side: null, why: "price unavailable" };
   if (!r.driver) return { signal: "NO TRADE", side: null, why: "move not scored" };
+  // Size first: a move under 1% gets no call either way (too small to matter after costs).
+  if (Math.abs(gap) < MIN_GAP_PCT) return { signal: "NO TRADE", side: null, why: `gap under ${MIN_GAP_PCT}%` };
   const topNews = Math.max(0, ...r.headlines.map((h) => h.score?.caused_move ?? 0));
   if (r.driver.news >= 0.5 && topNews >= 0.4) return { signal: "RESPECT", side: null, why: `news explains it (news ${Math.round(r.driver.news * 100)}%, top headline ${Math.round(topNews * 100)}%)` };
-  if (Math.abs(gap) < MIN_GAP_PCT) return { signal: "NO TRADE", side: null, why: `gap under ${MIN_GAP_PCT}%` };
   if (!depth.ok) return { signal: "NO TRADE", side: null, why: `too thin: ${depth.label}` };
   if (r.driver.onchain + r.driver.unexplained >= 0.5)
     return {
