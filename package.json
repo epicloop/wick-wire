@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
+    "@solana/web3.js": "^1.99.0",
     "next": "15.5.26",
     "react": "19.1.0",
     "react-dom": "19.1.0",
