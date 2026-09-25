@@ -1,6 +1,5 @@
 // prices → on-chain → news → score (one Claude call) → report. Cached so the LLM is never called per page view.
 import { createHash } from "node:crypto";
-import { unstable_cache } from "next/cache";
 import { cached } from "./cache";
 import { impact1k, prices as jupPrices } from "./jupiter";
 import { formatEt, marketClock } from "./market-hours";
@@ -10,9 +9,8 @@ import { latest, priceAt, regularClose, type Candle } from "./pyth";
 import { getScorer } from "./scorer";
 import type { ScoreInputEvent, ScoreMeta, ScoreOutput } from "./scorer/types";
 import { stats, takeLlmBudget } from "./stats";
-import { CROSS, CROSS_LABEL, STOCKS, TICKERS, type Stock, type Ticker } from "./stocks";
-import { boardFrom } from "./board";
-import type { BoardPayload, CrossRow, Flag, Mode, PricePoint, TickerReport } from "./types";
+import { CROSS, CROSS_LABEL, STOCKS, type Stock, type Ticker } from "./stocks";
+import type { CrossRow, Flag, Mode, PricePoint, TickerReport } from "./types";
 
 export const LIVE_TTL = 10 * 60_000; // re-gather every 10 min; the LLM only runs when the inputs change (hash cache)
 
@@ -259,25 +257,8 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
   };
 }
 
-async function buildLive(ticker: Ticker): Promise<TickerReport> {
+/** Gather live inputs and build a report (no caching: callers decide). */
+export async function buildLive(ticker: Ticker): Promise<TickerReport> {
   return assemble(STOCKS[ticker], await gatherLive(STOCKS[ticker]), "live");
 }
 
-// Shared across serverless instances (Vercel Data Cache), so an LLM call is paid once per 30 min per ticker.
-const sharedLive = unstable_cache(buildLive, ["report-live-v1"], { revalidate: LIVE_TTL / 1000 });
-
-export async function liveReport(ticker: Ticker): Promise<TickerReport> {
-  return cached(`report:live:${ticker}`, LIVE_TTL, async () => {
-    try {
-      return await sharedLive(ticker);
-    } catch {
-      return buildLive(ticker); // outside Next (scripts) unstable_cache is unavailable
-    }
-  });
-}
-
-export async function liveBoard(): Promise<BoardPayload> {
-  const reports = await Promise.all(TICKERS.map((t) => liveReport(t)));
-  const c = marketClock();
-  return boardFrom(reports, "live", { state: c.state, lastClose: c.lastClose, nextOpen: c.nextOpen }, null);
-}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { liveBoard } from "@/lib/pipeline";
+import { liveBoard } from "@/lib/live";
 import { loadReplay } from "@/lib/replay";
 
 export const dynamic = "force-dynamic";

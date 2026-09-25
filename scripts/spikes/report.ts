@@ -1,6 +1,6 @@
 // Run one live report end-to-end: npx tsx scripts/spikes/report.ts NVDA
 process.loadEnvFile?.(".env.local");
-import { liveReport } from "../../lib/pipeline";
+import { buildLive as liveReport } from "../../lib/pipeline";
 import { stats } from "../../lib/stats";
 const t = (process.argv[2] ?? "NVDA") as "NVDA";
 (async () => {

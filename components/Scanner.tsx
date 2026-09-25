@@ -26,6 +26,18 @@ const label = { fontSize: 13, fontWeight: 600, letterSpacing: ".06em", color: K.
 const card = { background: K.CARD, border: `1px solid ${K.LINE}`, padding: 24, display: "flex", flexDirection: "column", gap: 14 } as const;
 
 type Toast = { id: number; side: string; color: string; title: string; sub: string; meta: string };
+type ServerEvent = { id: number; at: number; ticker: string; kind: string; title: string; sub: string; url: string; side: string | null };
+type TradeRec = { id: number; ticker: string; side: string; opened_at: number; entry: number; entry_impact: number | null; qty: number; ref_close: number | null; gap_pct: number | null; why: string; settle_at: number; closed_at: number | null; exit: number | null; exit_source: string | null; net_pct: number | null; net_usd: number | null; status: string };
+type CallRec = { id: number; ticker: string; at: number; price: number; ref_close: number; gap_pct: number; why: string; settle_at: number; open_price: number | null; held: number | null };
+type Track = {
+  since: number | null;
+  lastScan: { at: number; ms: number; ok: number; failed: number } | null;
+  scanEveryMin: number;
+  totals: { scans: number; llmCalls: number; llmUsd: number; trades: number; open: number; closed: number; wins: number; netUsd: number; stakeUsd: number; calls: number; callsChecked: number; callsHeld: number };
+  signals: { ticker: string; signal: string; side: string | null; why: string; at: number }[];
+  trades: TradeRec[];
+  calls: CallRec[];
+};
 type Paper = { id: string; ticker: string; side: "BUY" | "SELL"; qty: number; fill: number; at: number; auto: boolean; mode: Mode };
 
 async function getJson<T>(url: string): Promise<T> {
@@ -95,7 +107,12 @@ export default function Scanner() {
   const [now, setNow] = useState(() => Date.now());
   const [paper, addPaper, clearPaper] = useLocalPaper();
   const seen = useRef<Record<string, { refs: Set<string>; signal: string }>>({});
+  const [serverFeed, setServerFeed] = useState<boolean | null>(null);
+  const [feed, setFeed] = useState<ServerEvent[]>([]);
+  const [trackRec, setTrackRec] = useState<Track | null | "offline">(null);
+  const lastEvent = useRef(0);
   const tid = useRef(0);
+  const serverFeedRef = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // URL state (?mode=replay&t=NVDA)
@@ -161,7 +178,7 @@ export default function Scanner() {
       const sigKey = `${s.signal}${s.side ?? ""}`;
       const prev = seen.current[r.ticker];
       seen.current[r.ticker] = { refs, signal: sigKey };
-      if (first || !prev || r.mode !== "live") return;
+      if (first || !prev || r.mode !== "live" || serverFeedRef.current) return;
       for (const h of r.headlines) if (!prev.refs.has("N:" + h.title))
         toast("NEWS", K.AMB, `${r.ticker} · ${h.title}`, `${h.source} · ${et(h.time)} ET`, `scanner · odds it caused the move ${h.score ? Math.round(h.score.caused_move * 100) + "%" : "—"}`);
       for (const e of r.onchain) if (!prev.refs.has("C:" + e.title))
@@ -169,19 +186,9 @@ export default function Scanner() {
       if (prev.signal !== sigKey) {
         const c = signalCopy(s, r);
         toast(s.side ?? (s.signal === "RESPECT" ? "HOLD" : "—"), s.side === "BUY" ? K.UP : s.side === "SELL" ? K.DN : K.SIG, `${r.ticker} · ${c.code}`, c.title, `scanner · signal changed · gap ${pct(gapOf(r))}`);
-        if (s.signal === "FADE" && s.side) {
-          const p = priceOf(r);
-          const imp = r.thin?.impactPct ?? 0;
-          if (p) {
-            const fill = s.side === "BUY" ? p * (1 + imp / 100) : p * (1 - imp / 100);
-            const qty = s.side === "BUY" ? (1000 * (1 - FEE_PER_SIDE_PCT / 100)) / fill : 1000 / p;
-            addPaper({ id: `${r.ticker}-${Date.now()}`, ticker: r.ticker, side: s.side, qty, fill, at: Date.now(), auto: true, mode: "live" });
-            toast(s.side, s.side === "BUY" ? K.UP : K.DN, `Auto paper ${s.side === "BUY" ? "buy" : "sell"} ${qty.toFixed(3)} ${r.token}`, `at ${usd(fill)} · $1,000 paper size`, "scanner · paper only · exit plan: next NYSE open");
-          }
-        }
       }
     },
-    [addPaper, gapOf, priceOf, sigOf, toast],
+    [gapOf, sigOf, toast],
   );
 
   // Load reports (+ poll in live mode).
@@ -215,6 +222,42 @@ export default function Scanner() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
+
+  // Shared scanner feed (our server): toasts for everything new, for every visitor.
+  useEffect(() => {
+    let alive = true;
+    const poll = async () => {
+      try {
+        const j = await getJson<{ events: ServerEvent[] }>(`/api/events${lastEvent.current ? `?since=${lastEvent.current}` : ""}`);
+        if (!alive) return;
+        serverFeedRef.current = true;
+        setServerFeed(true);
+        const first = lastEvent.current === 0;
+        const evs = [...j.events].sort((a, b) => a.id - b.id);
+        if (evs.length) lastEvent.current = evs.at(-1)!.id;
+        setFeed((f) => [...evs.reverse(), ...f].slice(0, 40));
+        if (!first)
+          for (const e of evs.slice(-4)) {
+            const col = e.kind === "NEWS" ? K.AMB : e.kind === "ON-CHAIN" ? K.VIO : e.side === "BUY" ? K.UP : e.side === "SELL" ? K.DN : K.SIG;
+            const badge = e.kind === "NEWS" ? "NEWS" : e.kind === "ON-CHAIN" ? "CHAIN" : (e.side ?? e.kind).slice(0, 5);
+            toast(badge, col, e.kind === "NEWS" || e.kind === "ON-CHAIN" ? `${e.ticker} · ${e.title}` : e.title, e.sub, `scanner · ${e.kind.toLowerCase()} · ${et(e.at)} ET`);
+          }
+      } catch {
+        if (!alive) return;
+        serverFeedRef.current = false;
+        setServerFeed(false);
+      }
+    };
+    const pollTrack = () => getJson<Track>("/api/track").then((t) => alive && setTrackRec(t)).catch(() => alive && setTrackRec("offline"));
+    poll();
+    pollTrack();
+    const a = setInterval(poll, 30_000), b = setInterval(pollTrack, 60_000);
+    return () => {
+      alive = false;
+      clearInterval(a);
+      clearInterval(b);
+    };
+  }, [toast]);
 
   // Live prices poll.
   useEffect(() => {
@@ -261,7 +304,7 @@ export default function Scanner() {
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: open ? K.UP : K.AMB }} />
             <span>{marketLine}</span>
           </div>
-          <ScannerStatus mode={mode} lastScan={lastScan} prices={prices} now={now} />
+          <ScannerStatus mode={mode} lastScan={trackRec && trackRec !== "offline" && trackRec.lastScan ? trackRec.lastScan.at : lastScan} prices={prices} now={now} server={serverFeed} />
           <div style={{ display: "flex", border: `1px solid ${K.LINE}`, fontFamily: JET, fontSize: 12 }}>
             <button onClick={() => setMode("live")} style={{ font: "inherit", padding: "7px 14px", border: 0, cursor: "pointer", background: mode === "live" ? K.FG : "transparent", color: mode === "live" ? K.BG : K.DIM }}>LIVE</button>
             <button onClick={() => setMode("replay")} style={{ font: "inherit", padding: "7px 14px", border: 0, cursor: "pointer", background: mode === "replay" ? K.AMB : "transparent", color: mode === "replay" ? K.BG : K.DIM }}>REPLAY 19–20 SEP</button>
@@ -335,7 +378,10 @@ export default function Scanner() {
         {/* 03 · replay backtest */}
         <Backtest bt={bt} onSelect={select} toast={toast} />
 
-        {/* 04 · scanner paper log */}
+        {/* 04 · scanner track record (server) */}
+        <TrackRecord track={trackRec} feed={feed} prices={prices?.prices ?? {}} onSelect={select} />
+
+        {/* 05 · your manual paper trades */}
         <PaperLog paper={paper} reports={reports} prices={prices?.prices ?? {}} onClear={clearPaper} />
 
         <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,260px),1fr))", gap: 24, paddingTop: 24, borderTop: `1px solid ${K.LINE}` }}>
@@ -386,13 +432,14 @@ function SectionHead({ n, title, note, right }: { n: string; title: string; note
   );
 }
 
-function ScannerStatus({ mode, lastScan, prices, now }: { mode: Mode; lastScan: number | null; prices: { at: number } | null; now: number }) {
+function ScannerStatus({ mode, lastScan, prices, now, server }: { mode: Mode; lastScan: number | null; prices: { at: number } | null; now: number; server: boolean | null }) {
   if (mode !== "live") return <span style={{ fontFamily: JET, fontSize: 12, color: K.DIM }}>SCANNER PAUSED · REPLAY</span>;
+  if (server === false) return <span style={{ fontFamily: JET, fontSize: 12, color: K.DN }}>SERVER SCANNER OFFLINE · browser mode</span>;
   const ago = (t: number | null) => (t == null ? "—" : `${Math.max(0, Math.round((now - t) / 1000))}s`);
   return (
     <span style={{ fontFamily: JET, fontSize: 12, color: K.DIM, display: "flex", alignItems: "center", gap: 6 }} title="Prices every 20 s · reports every 60 s (server re-gathers every 10 min)">
       <span className="pulse" style={{ width: 7, height: 7, borderRadius: "50%", background: K.SIG, display: "inline-block" }} />
-      SCANNER · price {ago(prices?.at ?? null)} · wire {ago(lastScan)}
+      SCANNER 24/7 · price {ago(prices?.at ?? null)} · last scan {ago(lastScan)}
     </span>
   );
 }
@@ -695,9 +742,9 @@ function PaperLog({ paper, reports, prices, onClear }: { paper: Paper[]; reports
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <SectionHead
-        n="04"
+        n="05"
         title="Your paper trades"
-        note="stored in this browser only · marked to the live price · auto = placed by the scanner"
+        note="the ones you clicked · stored in this browser only · marked to the live price"
         right={<button onClick={onClear} style={{ font: "inherit", fontSize: 13, color: K.DIM, background: "transparent", border: `1px solid ${K.LINE}`, padding: "6px 12px", cursor: "pointer" }}>Clear</button>}
       />
       <div style={{ border: `1px solid ${K.LINE}` }}>
@@ -717,6 +764,103 @@ function PaperLog({ paper, reports, prices, onClear }: { paper: Paper[]; reports
         })}
       </div>
       <div style={{ fontSize: 12, color: K.FAINT }}>Unrealized, after one side of fees. Paper only; nothing is executed. Not financial advice.</div>
+    </section>
+  );
+}
+
+function TrackRecord({ track, feed, prices, onSelect }: { track: Track | null | "offline"; feed: ServerEvent[]; prices: Record<string, number>; onSelect: (t: string) => void }) {
+  if (track === null) return null;
+  if (track === "offline")
+    return (
+      <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <SectionHead n="04" title="Scanner track record" note="our server scanner is offline right now; the rest of the page still works" />
+      </section>
+    );
+  const t = track.totals;
+  const since = track.since ? new Date(track.since).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET" : "—";
+  const stat = (k: string, v: string, c: string, s: string) => (
+    <div style={{ background: K.CARD, border: `1px solid ${K.LINE}`, padding: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ fontSize: 13, color: K.DIM }}>{k}</span>
+      <span style={{ fontFamily: JET, fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: c }}>{v}</span>
+      <span style={{ fontSize: 13, color: K.MID }}>{s}</span>
+    </div>
+  );
+  const openRows = track.trades.filter((x) => x.status === "open");
+  const unreal = openRows.reduce((s, x) => {
+    const p = prices[x.ticker];
+    return p ? s + (x.side === "BUY" ? (p - x.entry) * x.qty : (x.entry - p) * x.qty) : s;
+  }, 0);
+  const cols = "56px 64px minmax(0,1.4fr) minmax(0,1fr) 110px";
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <SectionHead n="04" title="Scanner track record" note={`runs by itself on our server every ${track.scanEveryMin} min · live since ${since} · paper only`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,190px),1fr))", gap: 12 }}>
+        {stat("Scans", String(t.scans), K.FG, `${t.llmCalls} AI calls · $${t.llmUsd.toFixed(2)} total`)}
+        {stat("Paper trades", String(t.trades), K.FG, t.trades ? `${t.open} open · ${t.closed} closed · ${t.wins} won` : "none yet: waiting for a FADE setup")}
+        {stat("Net after fees", t.closed ? signedUsd(t.netUsd) : "$0.00", t.netUsd > 0 ? K.UP : t.netUsd < 0 ? K.DN : K.FG, t.closed ? `on $${(t.closed * t.stakeUsd).toLocaleString()} closed` : openRows.length ? `open: ${signedUsd(unreal)} unrealized` : "no closed trades yet")}
+        {stat('"Respect" checks', `${t.callsHeld} / ${t.callsChecked}`, K.SIG, t.calls - t.callsChecked ? `${t.calls - t.callsChecked} waiting for the next open` : "gaps that held at the open")}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {track.signals.map((s) => (
+          <button key={s.ticker} onClick={() => onSelect(s.ticker)} title={s.why} style={{ font: "inherit", fontSize: 12, fontFamily: JET, padding: "5px 9px", cursor: "pointer", background: K.CARD, color: s.signal === "NO TRADE" ? K.DIM : K.SIG, border: `1px solid ${s.signal === "FADE" ? K.SIG : K.LINE}` }}>
+            {s.ticker} · {s.signal === "FADE" ? `FADE ${s.side}` : s.signal}
+          </button>
+        ))}
+      </div>
+
+      {(track.trades.length > 0 || track.calls.length > 0) && (
+        <div style={{ border: `1px solid ${K.LINE}`, overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: cols, gap: 14, padding: "10px 18px", fontSize: 12, fontWeight: 600, letterSpacing: ".06em", color: K.DIM, borderBottom: `1px solid ${K.LINE}`, minWidth: 620 }}>
+            <span>SIDE</span><span>STOCK</span><span>ENTRY</span><span>SETTLES AT NYSE OPEN</span><span style={{ textAlign: "right" }}>RESULT</span>
+          </div>
+          {track.trades.map((x) => {
+            const p = prices[x.ticker];
+            const live = x.status === "open" && p ? (x.side === "BUY" ? (p - x.entry) * x.qty : (x.entry - p) * x.qty) : null;
+            return (
+              <div key={`t${x.id}`} style={{ display: "grid", gridTemplateColumns: cols, gap: 14, alignItems: "center", padding: "10px 18px", borderBottom: `1px solid ${K.LINE2}`, fontSize: 14, minWidth: 620 }}>
+                <span style={{ fontFamily: JET, fontSize: 12, fontWeight: 800, textAlign: "center", padding: "2px 0", background: x.side === "BUY" ? K.UP : K.DN, color: K.BG }}>{x.side}</span>
+                <span style={{ fontFamily: JET, fontWeight: 600 }}>{x.ticker}</span>
+                <span style={{ color: K.FG2 }}>{x.qty.toFixed(3)} at {usd(x.entry)} <span style={{ color: K.DIM, fontSize: 12 }}>· {et(x.opened_at)} ET · gap {pct(x.gap_pct)}</span></span>
+                <span style={{ color: K.FG2 }}>{x.exit != null ? `${usd(x.exit)} · ${et(x.settle_at)}` : `${et(x.settle_at)} ET`}</span>
+                <span style={{ textAlign: "right", fontFamily: JET, fontWeight: 600, color: x.net_usd != null ? (x.net_usd >= 0 ? K.UP : K.DN) : live != null ? (live >= 0 ? K.UP : K.DN) : K.DIM }}>
+                  {x.net_usd != null ? signedUsd(x.net_usd) : live != null ? `${signedUsd(live)} open` : "open"}
+                </span>
+              </div>
+            );
+          })}
+          {track.calls.map((c) => (
+            <div key={`c${c.id}`} style={{ display: "grid", gridTemplateColumns: cols, gap: 14, alignItems: "center", padding: "10px 18px", borderBottom: `1px solid ${K.LINE2}`, fontSize: 14, minWidth: 620 }}>
+              <span style={{ fontFamily: JET, fontSize: 11, fontWeight: 800, textAlign: "center", padding: "2px 0", border: `1px solid ${K.SIG}`, color: K.SIG }}>HOLD</span>
+              <span style={{ fontFamily: JET, fontWeight: 600 }}>{c.ticker}</span>
+              <span style={{ color: K.FG2 }}>Respect the gap · token {usd(c.price)} vs close {usd(c.ref_close)} <span style={{ color: K.DIM, fontSize: 12 }}>· {et(c.at)} ET</span></span>
+              <span style={{ color: K.FG2 }}>{c.open_price != null ? `opened ${usd(c.open_price)}` : `${et(c.settle_at)} ET`}</span>
+              <span style={{ textAlign: "right", fontFamily: JET, fontWeight: 600, color: c.held == null ? K.DIM : c.held ? K.FG : K.DN }}>{c.held == null ? "waiting" : c.held ? "held ✓" : "closed ✗"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={label}>SCANNER LOG</span>
+        <div style={{ border: `1px solid ${K.LINE}`, maxHeight: 280, overflowY: "auto" }}>
+          {feed.length === 0 && <div style={{ padding: 14, fontSize: 14, color: K.DIM }}>Nothing logged yet.</div>}
+          {feed.map((e) => {
+            const col = e.kind === "NEWS" ? K.AMB : e.kind === "ON-CHAIN" ? K.VIO : e.side === "BUY" ? K.UP : e.side === "SELL" ? K.DN : K.SIG;
+            return (
+              <a key={e.id} href={e.url || undefined} target="_blank" rel="noreferrer" style={{ display: "grid", gridTemplateColumns: "92px 70px 52px minmax(0,1fr)", gap: 10, padding: "8px 14px", borderBottom: `1px solid ${K.LINE2}`, fontSize: 13, color: K.FG, textDecoration: "none" }}>
+                <span style={{ fontFamily: JET, fontSize: 11, color: K.FAINT }}>{et(e.at)}</span>
+                <span style={{ fontFamily: JET, fontSize: 11, fontWeight: 800, color: col }}>{e.kind}</span>
+                <span style={{ fontFamily: JET, fontSize: 12 }}>{e.ticker}</span>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}<span style={{ color: K.DIM }}> · {e.sub}</span></span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: K.FAINT }}>
+        Paper trades are opened automatically on FADE signals while the NYSE is closed ($1,000 each, real Jupiter price impact) and settled at the next NYSE open using the token&apos;s real price then, after {FEE_PER_SIDE_PCT}% fees per side. Nothing is ever executed. Not financial advice.
+      </div>
     </section>
   );
 }

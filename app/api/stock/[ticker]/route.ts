@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { liveReport } from "@/lib/pipeline";
+import { liveReport } from "@/lib/live";
 import { loadReplay } from "@/lib/replay";
 import { isTicker } from "@/lib/stocks";
 
