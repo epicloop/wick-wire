@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { boardFrom } from "@/lib/board";
 import { TICKERS } from "@/lib/stocks";
 import type { BoardPayload, TickerReport } from "@/lib/types";
+import { LiveSignals, ReplayBacktest } from "./Signals";
 import { FlagChip, Footer, Header, SOURCES_LINE, SplitBar, Wick, colorOf, etDay, etTime, fmtPct, fmtUsd, pctInt, useMode } from "./ui";
 
 type Sort = "move" | "conf" | "az";
@@ -147,6 +148,8 @@ export default function Board() {
             Array.from({ length: Math.max(0, 8 - rows.length - failed.length) }, (_, i) => (
               <div key={i} className="skeleton rule-b" style={{ height: 112, opacity: 0.6 }} />
             ))}
+          {mode === "live" && data && data.reports.length === 8 && <LiveSignals reports={rows} />}
+          {mode === "replay" && data?.backtest && <ReplayBacktest bt={data.backtest} />}
         </main>
 
         <aside className="rail">

@@ -55,6 +55,7 @@ export type BoardPayload = {
   replayLabel: string | null;
   reports: TickerReport[];
   wire: WireItem[];
+  backtest?: { exitLabel: string; rows: import("./signal").BacktestRow[]; generatedAt: number };
   stats: { headlines: number; onchainEvents: number; llmCalls: number; llmCostUsd: number; p50Ms: number | null; scorer: string };
 };
 

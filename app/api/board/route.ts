@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   if (mode === "replay") {
     const fx = await loadReplay();
     if (!fx) return NextResponse.json({ error: "replay fixture unavailable" }, { status: 404 });
-    return NextResponse.json(fx.board);
+    return NextResponse.json({ ...fx.board, backtest: fx.backtest });
   }
   try {
     return NextResponse.json(await liveBoard());

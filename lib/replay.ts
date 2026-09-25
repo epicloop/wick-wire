@@ -1,12 +1,17 @@
 // Replay fixture: a real past weekend recorded by scripts/build-replay.ts (Pyth, GeckoTerminal, Finnhub, Claude).
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import type { BacktestRow } from "./signal";
 import type { BoardPayload, ChartPayload } from "./types";
 
 export const REPLAY_FILE = "data/replay/2026-09-20.json";
 export const REPLAY_LABEL = "Replay: weekend of 19–20 Sep 2026";
 
-export type ReplayFixture = { board: BoardPayload; charts: Record<string, Partial<Record<"5" | "15" | "60", ChartPayload>>> };
+export type ReplayFixture = {
+  board: BoardPayload;
+  charts: Record<string, Partial<Record<"5" | "15" | "60", ChartPayload>>>;
+  backtest?: { exitLabel: string; rows: BacktestRow[]; generatedAt: number };
+};
 
 let memo: Promise<ReplayFixture | null> | null = null;
 

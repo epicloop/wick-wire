@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { BoardPayload, ChartPayload, TickerReport } from "@/lib/types";
+import { liveDepth, replayDepth, signalFor } from "@/lib/signal";
 import Chart, { type Pin } from "./Chart";
+import { SignalChip } from "./Signals";
 import { FlagChip, Footer, Header, SOURCES_LINE, colorOf, etLong, etWhen, fmtBig, fmtPct, fmtUsd, pctInt, useMode, useNow } from "./ui";
 
 const CAT: Record<string, string> = {
@@ -127,6 +129,16 @@ export default function Detail({ ticker }: { ticker: string }) {
                   <span className="muted">Explanation unavailable: {r.unavailable.join(", ") || "not scored"}.</span>
                 )}
               </div>
+              {(() => {
+                const sg = signalFor(r, r.mode === "replay" ? replayDepth(r) : liveDepth(r));
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, flexWrap: "wrap" }}>
+                    <span className="label">GAP SIGNAL · PAPER ONLY</span>
+                    <SignalChip s={sg.signal} side={sg.side} />
+                    <span className="muted">{sg.why} · not financial advice</span>
+                  </div>
+                );
+              })()}
               {d && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
                   <div className="split" style={{ height: 16 }}>
