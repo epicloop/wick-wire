@@ -12,7 +12,7 @@ const CHIP: Record<Signal, React.CSSProperties> = {
 
 export function SignalChip({ s, side }: { s: Signal; side?: "BUY" | "SELL" | null }) {
   return (
-    <span className="chip" style={CHIP[s]}>
+    <span className="chip" style={{ ...CHIP[s], justifySelf: "start", alignSelf: "center" }}>
       {s}
       {side ? ` · ${side}` : ""}
     </span>
@@ -67,8 +67,14 @@ export function ReplayBacktest({ bt }: { bt: NonNullable<BoardPayload["backtest"
   const rows = bt.rows;
   const traded = rows.filter((r) => r.netPct != null);
   const closed = (r: BacktestRow) =>
-    r.gapClosedPct == null ? "—" : r.gapClosedPct >= 0 ? `${Math.min(100, Math.round(r.gapClosedPct))}% closed` : `widened ${Math.round(-r.gapClosedPct)}%`;
-  const cols = "70px 150px 90px 90px 90px 110px 100px 120px minmax(0,1fr)";
+    r.gapClosedPct == null ? "—" : r.gapClosedPct >= 100
+        ? "fully closed"
+        : r.gapClosedPct >= 0
+          ? `${Math.round(r.gapClosedPct)}% closed`
+          : r.gapClosedPct < -200
+            ? "widened >2×"
+            : `widened ${Math.round(-r.gapClosedPct)}%`;
+  const cols = "60px 118px 76px 76px 76px 104px 88px 104px minmax(170px,1fr)";
   return (
     <section className="rule-t">
       <Head>

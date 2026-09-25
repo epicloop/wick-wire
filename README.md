@@ -30,6 +30,8 @@ For 8 xStocks (NVDA, TSLA, AAPL, MSFT, AMZN, META, SPY, QQQ):
 4. **Scoring:** one structured Claude Haiku call per ticker scores every event: probability it *caused this move*, category, importance, the news / on-chain / unexplained split, and whether holders should be alerted.
 5. **The bulletin:** up to 3 plain-English sentences, written **only** from the scored events and real numbers. If nothing scores ≥ 0.4, it says so: *"No clear catalyst — likely thin weekend trading or sector/macro drift."*
 
+6. **Gap signal (paper only):** FADE / RESPECT / NO TRADE per stock, with the real Jupiter $1,000 quote it would use. The replay panel checks the Sunday-night signal against the real Monday open, after fees, losses shown. Never executes. Not financial advice.
+
 Every number shows its source. When a source fails, the UI says "unavailable" rather than guessing.
 
 ## Why Solana, and why Pyth
