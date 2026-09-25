@@ -3,7 +3,7 @@
 ## Links
 - Live demo: https://wick-wire.vercel.app
 - Replay (real weekend 19–20 Sep 2026): https://wick-wire.vercel.app/?mode=replay
-- GitHub: _(add repo URL)_
+- GitHub: https://github.com/epicloop/wick-wire
 - Video (~90 s): _(add link)_
 
 ## Project name

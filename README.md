@@ -2,7 +2,7 @@
 
 **Other tools tell you how much your tokenized stock moved while Wall Street was closed. Wick Wire tells you why.**
 
-Live: https://wick-wire.vercel.app · Replay of a real weekend: https://wick-wire.vercel.app/?mode=replay · Pro desk view: https://wick-wire.vercel.app/desk
+Code: https://github.com/epicloop/wick-wire · Live: https://wick-wire.vercel.app · Replay of a real weekend: https://wick-wire.vercel.app/?mode=replay · Pro desk view: https://wick-wire.vercel.app/desk
 
 Built for the Solana Foundation **Stocklana** hackathon (Main track + Pyth bounty).
 
