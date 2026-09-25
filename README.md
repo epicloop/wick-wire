@@ -2,7 +2,7 @@
 
 **Other tools tell you how much your tokenized stock moved while Wall Street was closed. Wick Wire tells you why.**
 
-Live: https://wick-wire.vercel.app · Replay of a real weekend: https://wick-wire.vercel.app/?mode=replay
+Live: https://wick-wire.vercel.app · Replay of a real weekend: https://wick-wire.vercel.app/?mode=replay · Pro desk view: https://wick-wire.vercel.app/desk
 
 Built for the Solana Foundation **Stocklana** hackathon (Main track + Pyth bounty).
 
@@ -31,6 +31,8 @@ For 8 xStocks (NVDA, TSLA, AAPL, MSFT, AMZN, META, SPY, QQQ):
 5. **The bulletin:** up to 3 plain-English sentences, written **only** from the scored events and real numbers. If nothing scores ≥ 0.4, it says so: *"No clear catalyst — likely thin weekend trading or sector/macro drift."*
 
 6. **Gap signal (paper only):** FADE / RESPECT / NO TRADE per stock, with the real Jupiter $1,000 quote it would use. The replay panel checks the Sunday-night signal against the real Monday open, after fees, losses shown. Never executes. Not financial advice.
+
+7. **Autonomous scanner (live):** the home page re-polls prices every 20 s and reports every 60 s (server re-gathers every 10 min; Claude only re-scores when headlines/events change). New headlines, new on-chain events and signal changes pop up as toasts without a refresh; when a FADE appears the scanner logs an **automatic paper trade** (browser-only, marked to the live price). Nothing is ever executed.
 
 Every number shows its source. When a source fails, the UI says "unavailable" rather than guessing.
 
@@ -71,7 +73,8 @@ flowchart LR
   G --> E --> S --> R[(TickerReport)]
   R --> API["/api/stock/[t] · /api/board · /api/chart/[t]"]
   FX[(data/replay/2026-09-20.json)] --> API
-  API --> UI[Next.js UI<br/>Board · Stock page]
+  API --> UI[Next.js UI<br/>Guided page + scanner · Desk · Stock page]
+  UI -. polls /api/prices 20s, /api/stock 60s .-> API
 ```
 
 - `lib/stocks.ts`: tickers, Pyth feed ids (discovered via Hermes/Pyth symbols), **verified** xStock mints (Jupiter tokens API, `verified` + `xstocks` tag; look-alike pump tokens are rejected)

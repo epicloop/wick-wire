@@ -1,3 +1,5 @@
+> **Update:** the home page now follows **Wick Wire v3** (claude.ai/design file `Wick Wire v3.dc.html`): IBM Plex Sans + JetBrains Mono, amber #E8B04B / violet #A493FF / signal teal #6FD0C8 on #0B0C0A; sections 01 pick a stock · 02 what happened (how much · why · will it stick + paper trade) · 03 did the signals work (replay backtest, toasts) · 04 your paper trades. The v2 "Night Desk" below lives on at `/desk` and `/stock/[ticker]`.
+
 # Wick Wire — UI spec (from claude.ai/design "Wick Wire v2.dc.html", Direction 2 "The Night Desk")
 
 Source: https://claude.ai/design/p/dc26462a-7f32-44c0-955e-59b7e810dc04?file=Wick+Wire+v2.dc.html
