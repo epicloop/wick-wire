@@ -89,6 +89,7 @@ async function live() {
   const prices = (await j<{ prices: Record<string, number> }>(BASE + "/api/prices")).prices;
   const years = await Promise.all(TICKERS.map((t) => yahooDaily(t, Math.floor(Date.now() / 1000) - 10 * 86400, Math.floor(Date.now() / 1000)).catch(() => null)));
   for (const [i, t] of TICKERS.entries()) {
+   try {
     const r = await j<TickerReport>(`${BASE}/api/stock/${t}`);
     const ref = r.reference?.price, tok = r.tokenPrice?.price;
     if (ref && tok && r.gapPct != null) rec(B, `${t} gap = (token − ref)/ref`, Math.abs((tok - ref) / ref * 100 - r.gapPct) < 1e-9 ? "PASS" : "FAIL", `${r.gapPct.toFixed(3)}%`);
@@ -148,6 +149,9 @@ async function live() {
         rec(B, "BTC change (Pyth) vs Binance", Math.abs(bn - btc) < 0.35 ? "PASS" : "WARN", `Pyth ${btc.toFixed(2)}% · Binance ${bn.toFixed(2)}% (report cached ${Math.round((Date.now() - r.generatedAt) / 60000)} min)`);
       } else rec(B, "BTC change (Pyth) vs Binance", "WARN", "unavailable");
     }
+   } catch (e) {
+    rec(B, `${t} checks`, "WARN", `external source timed out: ${(e as Error).message}`);
+   }
   }
 }
 
