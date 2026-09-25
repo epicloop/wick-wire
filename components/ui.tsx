@@ -77,7 +77,7 @@ export function Header(props: {
       <header className="hdr rule-b">
         <Logo />
         {props.back ? (
-          <Link href={props.mode === "replay" ? "/?mode=replay" : "/"} className="tagline" style={{ fontSize: 12, color: "var(--muted)", textDecoration: "none", marginRight: "auto" }}>
+          <Link href={props.mode === "replay" ? "/desk?mode=replay" : "/desk"} className="tagline" style={{ fontSize: 12, color: "var(--muted)", textDecoration: "none", marginRight: "auto" }}>
             ← ALL MOVERS
           </Link>
         ) : (

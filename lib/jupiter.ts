@@ -9,7 +9,7 @@ const PriceV3 = z.record(z.string(), z.object({ usdPrice: z.number() }).passthro
 
 export async function prices(mints: string[]): Promise<Map<string, number>> {
   const ids = [...mints].sort().join(",");
-  return cached(`jup:price:${ids}`, 60_000, async () => {
+  return cached(`jup:price:${ids}`, 20_000, async () => {
     const r = await fetch(`${JUP}/price/v3?ids=${ids}`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
     if (!r.ok) throw new Error(`jupiter price ${r.status}`);
     const body = PriceV3.parse(await r.json());

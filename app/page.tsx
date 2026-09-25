@@ -1,5 +1,5 @@
-import Board from "@/components/Board";
+import Scanner from "@/components/Scanner";
 
 export default function Home() {
-  return <Board />;
+  return <Scanner />;
 }

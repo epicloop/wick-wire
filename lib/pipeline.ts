@@ -14,7 +14,7 @@ import { CROSS, CROSS_LABEL, STOCKS, TICKERS, type Stock, type Ticker } from "./
 import { boardFrom } from "./board";
 import type { BoardPayload, CrossRow, Flag, Mode, PricePoint, TickerReport } from "./types";
 
-export const LIVE_TTL = 30 * 60_000;
+export const LIVE_TTL = 10 * 60_000; // re-gather every 10 min; the LLM only runs when the inputs change (hash cache)
 
 /** Everything the report needs, gathered either live or from history (replay script). */
 export type Gathered = {
@@ -192,7 +192,7 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
   const unavailable = [...g.unavailable];
   if (gapPct != null) {
     const hash = createHash("sha1")
-      .update(JSON.stringify({ ...input, movePct: Math.round(gapPct * 4) / 4, fromPrice: null, toPrice: null, events: events.map((e) => [e.ref, e.text]) }))
+      .update(JSON.stringify({ ...input, movePct: Math.round(gapPct * 2) / 2, fromPrice: null, toPrice: null, events: events.map((e) => [e.ref, e.text]) }))
       .digest("hex");
     try {
       scored = await cached(`score:${stock.ticker}:${hash}`, 6 * 3_600_000, async () => {
