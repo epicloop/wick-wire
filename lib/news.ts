@@ -59,9 +59,11 @@ const decode = (s: string) =>
   s.replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
 
 /** Fallback: Google News RSS search (no key). Each item keeps its real publisher. */
-async function googleNews(query: string, fromSec: number): Promise<Headline[]> {
+async function googleNews(query: string, fromSec: number, toSec?: number): Promise<Headline[]> {
   const days = Math.max(1, Math.ceil((Date.now() / 1000 - fromSec) / 86400) + 1);
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:${days}d`)}&hl=en-US&gl=US&ceid=US:en`;
+  // Historical windows use after:/before: (dates, UTC); live uses when:Nd.
+  const q = toSec ? `${query} after:${ymd(fromSec - 86400)} before:${ymd(toSec + 86400)}` : `${query} when:${days}d`;
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`;
   const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`google news ${r.status}`);
   const xml = await r.text();
@@ -98,7 +100,8 @@ export async function headlines(
     } catch (e) {
       console.warn(`[news] finnhub ${ticker}:`, (e as Error).message);
     }
-    return { items: pick(await googleNews(query, fromSec)), via: "google-news" as const };
+    const historical = toSec < Date.now() / 1000 - 6 * 3600;
+    return { items: pick(await googleNews(query, fromSec, historical ? toSec : undefined)), via: "google-news" as const };
   });
 }
 

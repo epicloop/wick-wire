@@ -26,7 +26,8 @@ export const ScoreOutput = z.object({
     z.object({
       ref: z.string(),
       caused_move: z.number().describe("probability 0-1 that this event caused the move"),
-      category: Category,
+      // Loose on the wire (the model occasionally invents a label); mapped onto the enum in sanitize().
+      category: z.string().describe(`one of: ${CATEGORIES.join(" | ")}`),
       importance: z.number().describe("0-100"),
     }),
   ),
@@ -37,7 +38,10 @@ export const ScoreOutput = z.object({
     .array(z.object({ text: z.string(), ref: z.string().nullable() }))
     .describe("the explanation as ordered text segments; a segment that paraphrases an event carries its ref, others null"),
 });
-export type ScoreOutput = z.infer<typeof ScoreOutput>;
+type RawScoreOutput = z.infer<typeof ScoreOutput>;
+export type ScoreOutput = Omit<RawScoreOutput, "scores"> & {
+  scores: (Omit<RawScoreOutput["scores"][number], "category"> & { category: Category })[];
+};
 
 export type ScoreMeta = { model: string; latencyMs: number; inputTokens: number; outputTokens: number; costUsd: number };
 
@@ -47,7 +51,16 @@ export interface Scorer {
 }
 
 /** Clamp + normalise model output so the UI can trust it. */
-export function sanitize(out: ScoreOutput, refs: Set<string>): ScoreOutput {
+const asCategory = (c: string): Category => {
+  const k = c.toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "");
+  if ((CATEGORIES as readonly string[]).includes(k)) return k as Category;
+  if (k.includes("legal") || k.includes("regulat")) return "legal_regulatory";
+  if (k.includes("merger") || k.includes("acqui") || k === "m_a") return "m_and_a";
+  if (k.includes("chain")) return "onchain";
+  return "other";
+};
+
+export function sanitize(out: RawScoreOutput, refs: Set<string>): ScoreOutput {
   const c01 = (x: number) => Math.min(1, Math.max(0, Number.isFinite(x) ? x : 0));
   const d = { news: c01(out.driver.news), onchain: c01(out.driver.onchain), unexplained: c01(out.driver.unexplained) };
   const sum = d.news + d.onchain + d.unexplained || 1;
@@ -55,7 +68,7 @@ export function sanitize(out: ScoreOutput, refs: Set<string>): ScoreOutput {
     ...out,
     scores: out.scores
       .filter((s) => refs.has(s.ref))
-      .map((s) => ({ ...s, caused_move: c01(s.caused_move), importance: Math.round(Math.min(100, Math.max(0, s.importance))) })),
+      .map((s) => ({ ...s, category: asCategory(s.category), caused_move: c01(s.caused_move), importance: Math.round(Math.min(100, Math.max(0, s.importance))) })),
     driver: { news: d.news / sum, onchain: d.onchain / sum, unexplained: d.unexplained / sum },
     alert_holders: { yes: out.alert_holders.yes, confidence: c01(out.alert_holders.confidence) },
     explanation: out.explanation.map((s) => ({ text: s.text, ref: s.ref && refs.has(s.ref) ? s.ref : null })),

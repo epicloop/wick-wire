@@ -25,6 +25,7 @@ export type Gathered = {
   pools: Pool[];
   hourly: Candle[];
   trades: Trade[] | null;
+  pairedWindow?: { pool: Pool; otherMovePct: number | null; volUsd: number; peakTime: number }[];
   thin: { impactPct: number; route: string } | null;
   supply: number | null;
   headlines: Headline[];
@@ -158,6 +159,7 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
     refPrice: tokenP,
     fromSec: g.window.from,
     toSec: g.window.to,
+    pairedWindow: g.pairedWindow,
   });
   const heads = g.headlines.map((h, i) => ({ ...h, ref: `N${i + 1}` }));
   const prices = g.hourly.flatMap((c) => [c.h, c.l]).concat(tokenP ?? [], refP ?? []);

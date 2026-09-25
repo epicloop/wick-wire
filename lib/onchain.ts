@@ -188,8 +188,10 @@ export function buildEvents(input: {
   refPrice: number | null;
   fromSec: number;
   toSec: number;
+  /** Replay: paired pools measured over the window itself (instead of "now / 24h" snapshots). */
+  pairedWindow?: { pool: Pool; otherMovePct: number | null; volUsd: number; peakTime: number }[];
 }): OnchainEvent[] {
-  const { stock, pools: ps, mainPool, hourly, trades, refPrice, fromSec, toSec } = input;
+  const { stock, pools: ps, mainPool, hourly, trades, refPrice, fromSec, toSec, pairedWindow } = input;
   const ev: (OnchainEvent & { weight: number })[] = [];
   const windowVol = hourly.reduce((s, c) => s + (c.v ?? 0), 0);
 
@@ -238,8 +240,8 @@ export function buildEvents(input: {
     }
   }
 
-  // Pool divergence: a pool with real liquidity pricing the xStock > 1% away from the reference.
-  if (refPrice) {
+  // Pool divergence: a pool with real liquidity pricing the xStock > 1% away from the reference (live only).
+  if (refPrice && !pairedWindow) {
     for (const p of ps.filter((p) => p.liquidityUsd >= 10_000 && p.impliedPrice)) {
       const dev = ((p.impliedPrice! - refPrice) / refPrice) * 100;
       if (Math.abs(dev) > 1)
@@ -256,9 +258,25 @@ export function buildEvents(input: {
     }
   }
 
-  // Paired tokens (memecoins etc.) with meaningful 24 h volume.
+  // Replay: paired tokens over the window.
+  for (const w of pairedWindow ?? []) {
+    if (w.volUsd < 10_000 || w.volUsd < windowVol * 0.02) continue;
+    const mv = w.otherMovePct;
+    ev.push({
+      id: "",
+      kind: "paired_token",
+      time: w.peakTime,
+      title: `$${w.pool.otherSymbol}, paired against ${stock.token}, ${mv == null ? "moved" : `${mv >= 0 ? "+" : "−"}${Math.abs(mv).toFixed(0)}%`} over the window; ${usd(w.volUsd)} traded in its pool (${Math.round((w.volUsd / (windowVol || 1)) * 100)}% of the main pool's volume)`,
+      detail: `${w.pool.dex} · busiest hour shown`,
+      link: `https://solscan.io/account/${w.pool.address}`,
+      linkLabel: `${short(w.pool.address)} · Solscan`,
+      weight: w.volUsd,
+    });
+  }
+
+  // Live: paired tokens (memecoins etc.) with meaningful 24 h volume.
   const totalVol = ps.reduce((s, p) => s + p.volume24hUsd, 0) || 1;
-  for (const p of ps.filter((p) => p.paired && p.volume24hUsd >= 10_000 && p.volume24hUsd / totalVol >= 0.02).sort((a, b) => b.volume24hUsd - a.volume24hUsd).slice(0, 3)) {
+  if (!pairedWindow) for (const p of ps.filter((p) => p.paired && p.volume24hUsd >= 10_000 && p.volume24hUsd / totalVol >= 0.02).sort((a, b) => b.volume24hUsd - a.volume24hUsd).slice(0, 3)) {
     const share = (p.volume24hUsd / totalVol) * 100;
     const mv = p.otherChange24hPct;
     ev.push({

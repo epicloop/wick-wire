@@ -4,7 +4,7 @@ import type { Candle } from "./pyth";
 import type { Category, ScoreMeta } from "./scorer/types";
 
 export type Mode = "live" | "replay";
-export type Source = "pyth" | "finnhub" | "jupiter" | "geckoterminal" | "dexscreener";
+export type Source = "pyth" | "finnhub" | "yahoo" | "jupiter" | "geckoterminal" | "dexscreener";
 
 export type PricePoint = { price: number; time: number; source: Source; label: string };
 
