@@ -1,0 +1,166 @@
+{
+  "discoveredAt": "2026-09-25T08:48:48.195Z",
+  "stocks": {
+    "NVDA": {
+      "equity": {
+        "id": "0xb1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593",
+        "symbol": "Equity.US.NVDA/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0x4244d07890e4610f46bbde67de8f43a4bf8b569eebe904f136b469f148503b7f",
+        "symbol": "Crypto.NVDAX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+        "decimals": 8,
+        "name": "NVIDIA xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "TSLA": {
+      "equity": {
+        "id": "0x16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1",
+        "symbol": "Equity.US.TSLA/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0x47a156470288850a440df3a6ce85a55917b813a19bb5b31128a33a986566a362",
+        "symbol": "Crypto.TSLAX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB",
+        "decimals": 8,
+        "name": "Tesla xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "AAPL": {
+      "equity": {
+        "id": "0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688",
+        "symbol": "Equity.US.AAPL/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0x978e6cc68a119ce066aa830017318563a9ed04ec3a0a6439010fc11296a58675",
+        "symbol": "Crypto.AAPLX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp",
+        "decimals": 8,
+        "name": "Apple xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "MSFT": {
+      "equity": {
+        "id": "0xd0ca23c1cc005e004ccf1db5bf76aeb6a49218f43dac3d4b275e92de12ded4d1",
+        "symbol": "Equity.US.MSFT/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0xbb723a70af731ab56b9a650eb7e8ac22b7bc07ea77f8670bd1fa9a37bf6df3f5",
+        "symbol": "Crypto.MSFTX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX",
+        "decimals": 8,
+        "name": "Microsoft xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "AMZN": {
+      "equity": {
+        "id": "0xb5d0e0fa58a1f8b81498ae670ce93c872d14434b72c364885d4fa1b257cbb07a",
+        "symbol": "Equity.US.AMZN/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0x7148fbe6e493ff2580305c92a8d7f8628c9943b11b9b253aebc24863fec290e8",
+        "symbol": "Crypto.AMZNX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg",
+        "decimals": 8,
+        "name": "Amazon xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "META": {
+      "equity": {
+        "id": "0x78a3e3b8e676a8f73c439f5d749737034b139bbbe899ba5775216fba596607fe",
+        "symbol": "Equity.US.META/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0xbf3e5871be3f80ab7a4d1f1fd039145179fb58569e159aee1ccd472868ea5900",
+        "symbol": "Crypto.METAX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu",
+        "decimals": 8,
+        "name": "Meta xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "SPY": {
+      "equity": {
+        "id": "0x19e09bb805456ada3979a7d1cbb4b6d63babc3a0f8e8a9509f68afa5c4c11cd5",
+        "symbol": "Equity.US.SPY/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0x2817b78438c769357182c04346fddaad1178c82f4048828fe0997c3c64624e14",
+        "symbol": "Crypto.SPYX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W",
+        "decimals": 8,
+        "name": "SP500 xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    },
+    "QQQ": {
+      "equity": {
+        "id": "0x9695e2b96ea7b3859da9ed25b7a46a920a776e2fdae19a7bcfdf2b219230452d",
+        "symbol": "Equity.US.QQQ/USD",
+        "schedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0907/C,1126/C,1127/0930-1300,1224/0930-1300,1225/C,0101/C,0118/C,0215/C,0326/C,0531/C,0618/C,0705/C"
+      },
+      "xstock": {
+        "id": "0x178a6f73a5aede9d0d682e86b0047c9f333ed0efe5c6537ca937565219c4054d",
+        "symbol": "Crypto.QQQX/USD",
+        "schedule": "America/New_York;O,O,O,O,O,O,O;"
+      },
+      "mint": {
+        "address": "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ",
+        "decimals": 8,
+        "name": "Nasdaq xStock",
+        "source": "jupiter tokens/v2 (verified, tag xstocks)"
+      }
+    }
+  },
+  "cross": {
+    "XAU": {
+      "id": "0x765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2",
+      "symbol": "Metal.XAU/USD",
+      "schedule": "America/New_York;0000-1700&1800-2400,0000-1700&1800-2400,0000-1700&1800-2400,0000-1700&1800-2400,0000-1700,C,1800-2400;0907/0000-1430&1800-2400,1126/0000-1430&1800-2400,1127/0000-1445,1224/0000-1345,1225/C,1231/0000-1700,0101/C,0118/0000-1430&1800-2400,0215/0000-1430&1800-2400,0325/0000-1700,0326/C,0531/0000-1430&1800-2400,0618/0000-1300,0705/0000-1430&1800-2400"
+    },
+    "BTC": {
+      "id": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+      "symbol": "Crypto.BTC/USD",
+      "schedule": "America/New_York;O,O,O,O,O,O,O;"
+    },
+    "EURUSD": {
+      "id": "0xa995d00bb36a63cef7fd2c287dc105fc8f3d93779f062f09551b0af3e81ec30b",
+      "symbol": "FX.EUR/USD",
+      "schedule": "America/New_York;O,O,O,O,0000-1700,C,1700-2400;1224/0000-1700,1231/0000-1700"
+    }
+  }
+}
