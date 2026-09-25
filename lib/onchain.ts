@@ -273,5 +273,6 @@ export function buildEvents(input: {
     .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || b.weight - a.weight)
     .slice(0, 8)
     .sort((a, b) => a.time - b.time)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .map(({ weight: _w, ...e }, i) => ({ ...e, id: String.fromCharCode(65 + i) }));
 }
