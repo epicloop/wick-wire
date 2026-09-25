@@ -30,8 +30,8 @@ The problem exists because xStocks trade 24/7 on Solana, and half the answer liv
 - **Cross-asset context:** gold, BTC and EUR/USD over the same hours from Hermes (live) and Benchmarks (historical).
 - **Entitlement-aware client:** checks which feeds the key may read, batches only those, and falls back (labelled) for the rest. A full Pyth Pro key switches every xStock and equity price to Pyth with no code change.
 
-## Autonomous scanner
-The live page watches by itself: prices every 20 s, headlines and on-chain events every minute. New headlines, on-chain events and signal changes pop up without a refresh, and a FADE signal triggers an automatic paper trade marked to the live price. Paper only.
+## Autonomous scanner (our own server)
+A worker on our AWS Lightsail server scans all 8 stocks every 15 minutes, 24/7: it logs every new headline, on-chain event and signal change, auto-opens a $1,000 paper trade on each FADE signal while the NYSE is closed, settles it at the next NYSE open with the real token price after fees, and checks every "respect the gap" call at the open. The home page shows this public track record (live since 25 Sep 2026) and pops new events as toasts without a refresh. Paper only: nothing is ever executed.
 
 ## Gap signals (paper only)
 Wick Wire also turns the "why" into a paper signal per stock: **FADE** (gap ≥ 1%, mostly on-chain or unexplained, enough Jupiter depth: expect it to close at the open), **RESPECT** (news explains it), or **NO TRADE**. Live, it shows the real $1,000 Jupiter quote and price impact it would use. It never trades or signs anything. Replay example (1 weekend, 8 stocks): no FADE setups; the two RESPECT calls (MSFT, SPY) kept widening into Monday's open; fading every gap blindly would have lost money on 8 of 8 stocks after fees. One weekend is an example, not evidence of an edge. Not financial advice.

@@ -32,7 +32,8 @@ For 8 xStocks (NVDA, TSLA, AAPL, MSFT, AMZN, META, SPY, QQQ):
 
 6. **Gap signal (paper only):** FADE / RESPECT / NO TRADE per stock, with the real Jupiter $1,000 quote it would use. The replay panel checks the Sunday-night signal against the real Monday open, after fees, losses shown. Never executes. Not financial advice.
 
-7. **Autonomous scanner (live):** the home page re-polls prices every 20 s and reports every 60 s (server re-gathers every 10 min; Claude only re-scores when headlines/events change). New headlines, new on-chain events and signal changes pop up as toasts without a refresh; when a FADE appears the scanner logs an **automatic paper trade** (browser-only, marked to the live price). Nothing is ever executed.
+7. **Autonomous scanner (our own server):** a worker on AWS Lightsail (`worker/scanner.ts`, systemd, SQLite) scans all 8 stocks every 15 minutes, 24/7. It logs every new headline, on-chain event and signal change, **auto-opens a $1,000 paper trade on each FADE signal** while the NYSE is closed (real Jupiter price impact), **settles it at the next NYSE open** with the token's real price, and checks every RESPECT call at the open. The home page shows this public **track record** (trades, win rate, net after fees, RESPECT hit rate, scanner log) and pops new events as toasts for every visitor.
+8. **Live page (browser):** the home page re-polls prices every 20 s and reports every 60 s (server re-gathers every 10 min; Claude only re-scores when headlines/events change). New headlines, new on-chain events and signal changes pop up as toasts without a refresh; when a FADE appears the scanner logs an **automatic paper trade** (browser-only, marked to the live price). Nothing is ever executed.
 
 Every number shows its source. When a source fails, the UI says "unavailable" rather than guessing.
 
@@ -73,6 +74,11 @@ flowchart LR
   G --> E --> S --> R[(TickerReport)]
   R --> API["/api/stock/[t] · /api/board · /api/chart/[t]"]
   FX[(data/replay/2026-09-20.json)] --> API
+  subgraph Server["Our server (AWS Lightsail, systemd)"]
+    W[worker/scanner.ts<br/>every 15 min · SQLite ledger<br/>paper trades · RESPECT checks · event log]
+  end
+  W -->|same pipeline| G
+  W -->|"read-only API (token)"| API
   API --> UI[Next.js UI<br/>Guided page + scanner · Desk · Stock page]
   UI -. polls /api/prices 20s, /api/stock 60s .-> API
 ```
@@ -90,6 +96,15 @@ flowchart LR
 
 - **Live** (default): current state of the market. First load of each ticker takes a while (free-tier rate limits on GeckoTerminal/Finnhub); results are cached for 30 minutes and scoring is cached by input hash, so the LLM is never called per page view.
 - **Replay**: the real weekend of **Fri 18 Sep 2026 16:00 ET → Sun 20 Sep 2026 20:00 ET**, recorded once by `scripts/build-replay.ts` from Pyth, Yahoo Finance (Friday close for tickers our Pyth key isn't entitled to), GeckoTerminal, Google News and Claude. Clearly badged REPLAY. Zero API calls at demo time.
+
+## Server scanner
+
+```bash
+npm run build:worker                      # → dist/scanner.mjs (single file, Node ≥ 22.5 for node:sqlite)
+# on the server: ~/wick-wire/{scanner.mjs,.env}, systemd unit wick-wire.service
+node --env-file=.env dist/scanner.mjs     # API on :7910 (Bearer WORKER_TOKEN): /health /reports /report/:t /events /track
+```
+The Vercel app reads it via `WORKER_URL` + `WORKER_TOKEN`; without them it computes reports itself.
 
 ## Run it
 
