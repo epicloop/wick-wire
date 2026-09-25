@@ -108,7 +108,15 @@ async function live() {
     const ds = await j<any[]>(`https://api.dexscreener.com/token-pairs/v1/solana/${STOCKS[t].mint}`).catch(() => []);
     const main = ds.filter((p) => p.baseToken.address === STOCKS[t].mint && p.quoteToken.symbol === "USDC").sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
     if (tok && main) rec(B, `${t} token price vs DexScreener main pool`, near(tok, Number(main.priceUsd), 1) ? "PASS" : "WARN", `ours ${tok.toFixed(2)} · pool ${Number(main.priceUsd).toFixed(2)} (report cached ${Math.round((Date.now() - r.generatedAt) / 60000)} min)`);
-    if (prices[t] && main) rec(B, `${t} live Jupiter price vs DexScreener`, near(prices[t], Number(main.priceUsd), 0.5) ? "PASS" : "WARN", `${prices[t].toFixed(2)} vs ${Number(main.priceUsd).toFixed(2)}`);
+    if (prices[t] && main) rec(B, `${t} live ticker price vs DexScreener`, near(prices[t], Number(main.priceUsd), 0.3) ? "PASS" : "WARN", `${prices[t].toFixed(2)} vs ${Number(main.priceUsd).toFixed(2)}`);
+    // Token price vs an executable Jupiter round-trip quote (the price you could actually trade at).
+    const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", m = STOCKS[t].mint, dec = STOCKS[t].decimals;
+    const qb = await j<any>(`https://lite-api.jup.ag/swap/v1/quote?inputMint=${USDC}&outputMint=${m}&amount=100000000&slippageBps=50`).catch(() => null);
+    const qsell = qb ? await j<any>(`https://lite-api.jup.ag/swap/v1/quote?inputMint=${m}&outputMint=${USDC}&amount=${qb.outAmount}&slippageBps=50`).catch(() => null) : null;
+    if (tok && qb && qsell) {
+      const n = Number(qb.outAmount) / 10 ** dec, mid = (100 / n + Number(qsell.outAmount) / 1e6 / n) / 2;
+      rec(B, `${t} token price vs executable Jupiter mid`, near(tok, mid, 0.35) ? "PASS" : "WARN", `ours ${tok.toFixed(2)} (${r.tokenPrice?.label}) · quote mid ${mid.toFixed(2)} · report cached ${Math.round((Date.now() - r.generatedAt) / 60000)} min`);
+    }
     // Headlines inside the window, ≤ 15, unique.
     const out = r.headlines.filter((h) => h.time < r.window.from || h.time > r.window.to + 60);
     rec(B, `${t} headlines inside window (${r.headlines.length})`, out.length === 0 ? "PASS" : "FAIL", out.map((h) => h.title.slice(0, 40)).join(" | "));

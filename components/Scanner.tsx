@@ -399,7 +399,7 @@ export default function Scanner() {
 
         <div style={{ fontSize: 12, color: K.FAINT, display: "flex", flexWrap: "wrap", gap: "6px 20px" }}>
           <span>Not financial advice. Tokenized stocks are not available to US persons and are restricted in some regions.</span>
-          <span>Prices: Pyth (entitled feeds), Jupiter · Pools: DexScreener, GeckoTerminal · News: Finnhub, Google News · Scoring: Claude Haiku{mode === "replay" ? " · Replay data" : ""}</span>
+          <span>Prices: Pyth (entitled feeds), Jupiter quotes, DEX pools · Pools: DexScreener, GeckoTerminal · News: Finnhub, Google News · Scoring: Claude Haiku{mode === "replay" ? " · Replay data" : ""}</span>
           <Link href={`/desk${mode === "replay" ? "?mode=replay" : ""}`} style={{ color: K.DIM }}>Pro desk view →</Link>
         </div>
       </main>
@@ -475,7 +475,7 @@ function Detail(props: { r: TickerReport; price: number | null; gap: number | nu
         </div>
         <LineChart chart={chart} r={r} gap={gap} reasons={reasons} />
         <div style={{ fontSize: 11, color: K.FAINT, fontFamily: JET }}>
-          {[r.reference?.label, mode === "live" ? `${r.token} NOW · JUPITER (live)` : r.tokenPrice?.label].filter(Boolean).join(" · ")}
+          {[r.reference?.label, mode === "live" ? `${r.token} NOW · DEEPEST USDC POOL (live, 15 s)` : r.tokenPrice?.label].filter(Boolean).join(" · ")}
         </div>
       </div>
 

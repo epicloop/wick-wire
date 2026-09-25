@@ -1,7 +1,7 @@
 // prices → on-chain → news → score (one Claude call) → report. Cached so the LLM is never called per page view.
 import { createHash } from "node:crypto";
 import { cached } from "./cache";
-import { impact1k, prices as jupPrices } from "./jupiter";
+import { impact1k, prices as jupPrices, quoteMid } from "./jupiter";
 import { formatEt, marketClock } from "./market-hours";
 import { headlines as fetchHeadlines, quote, type Headline } from "./news";
 import { bigTrades, buildEvents, poolCandles, pools as fetchPools, supply as fetchSupply, type OnchainEvent, type Pool, type Trade } from "./onchain";
@@ -90,8 +90,13 @@ async function gatherLive(stock: Stock): Promise<Gathered> {
   const px = (await settle(latest([stock.xstock]), "Pyth xStock", miss))?.get(stock.xstock.symbol);
   if (px) tokenPrice = { price: px.price, time: px.publishTime, source: "pyth", label: `${stock.token} NOW · PYTH` };
   else {
-    const j = (await settle(jupPrices(Object.values(STOCKS).map((s) => s.mint)), "Jupiter price", miss))?.get(stock.mint);
-    if (j) tokenPrice = { price: j, time: now, source: "jupiter", label: `${stock.token} NOW · JUPITER` };
+    // Executable mid from real Jupiter quotes; Price v3 only as a last resort.
+    const mid = await quoteMid(stock.mint, stock.decimals);
+    if (mid) tokenPrice = { price: mid, time: now, source: "jupiter", label: `${stock.token} NOW · JUPITER QUOTE` };
+    else {
+      const j = (await settle(jupPrices(Object.values(STOCKS).map((s) => s.mint)), "Jupiter price", miss))?.get(stock.mint);
+      if (j) tokenPrice = { price: j, time: now, source: "jupiter", label: `${stock.token} NOW · JUPITER` };
+    }
   }
 
   const [pools, thin, supply, headlines, cross] = await Promise.all([
