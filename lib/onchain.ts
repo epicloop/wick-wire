@@ -8,7 +8,7 @@ import type { Candle } from "./pyth";
 const GT = "https://api.geckoterminal.com/api/v2";
 const DS = "https://api.dexscreener.com";
 const RPC = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
-const gtSlot = throttle(2200); // GeckoTerminal free tier ≈ 30 req/min
+const gtSlot = throttle(2500); // GeckoTerminal free tier ≈ 30 req/min
 
 export type Pool = {
   address: string;
@@ -52,7 +52,7 @@ const DsPair = z.object({
 });
 
 async function dsJson(url: string) {
-  const r = await fetch(url, { cache: "no-store" });
+  const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
   if (!r.ok) throw new Error(`dexscreener ${r.status}`);
   return r.json();
 }
@@ -99,12 +99,16 @@ export async function pools(stock: Stock): Promise<Pool[]> {
 }
 
 async function gt(path: string) {
-  return gtSlot(async () => {
-    const r = await fetch(`${GT}${path}`, { cache: "no-store", headers: { accept: "application/json" } });
+  for (let attempt = 0; ; attempt++) {
+    const r = await gtSlot(() => fetch(`${GT}${path}`, { cache: "no-store", headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) }));
+    if (r.status === 429 && attempt < 2) {
+      await new Promise((res) => setTimeout(res, 12_000 * (attempt + 1)));
+      continue;
+    }
     if (r.status === 429) throw new Error("geckoterminal rate limited");
     if (!r.ok) throw new Error(`geckoterminal ${r.status}`);
     return r.json();
-  });
+  }
 }
 
 const Ohlcv = z.object({ data: z.object({ attributes: z.object({ ohlcv_list: z.array(z.array(z.number())) }) }) });
@@ -160,6 +164,7 @@ export async function supply(mint: string): Promise<number | null> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTokenSupply", params: [mint] }),
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
     const j = await r.json();
     return (j.result?.value?.uiAmount as number | undefined) ?? null;

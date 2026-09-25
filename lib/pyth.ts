@@ -19,7 +19,7 @@ function headers() {
 
 async function get(url: string) {
   stats.pythCalls++;
-  const r = await fetch(url, { headers: headers(), cache: "no-store" });
+  const r = await fetch(url, { headers: headers(), cache: "no-store", signal: AbortSignal.timeout(15_000) });
   if (!r.ok) throw new Error(`pyth ${r.status}: ${(await r.text()).slice(0, 160)}`);
   return r.json();
 }

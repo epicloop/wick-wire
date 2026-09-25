@@ -11,6 +11,7 @@ export type ScoreInput = {
   ticker: string;
   token: string;
   windowLabel: string; // e.g. "Fri 18 Sep 16:00 ET → Sun 20 Sep 20:00 ET"
+  session: string; // "weekend" | "overnight" | "after-hours" | "regular-session"
   movePct: number | null;
   refLabel: string; // what the move is measured against
   fromPrice: number | null;

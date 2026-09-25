@@ -19,8 +19,8 @@ Score every event (by its ref):
 driver: probabilities (sum 1) that the move is explained by news, by on-chain activity, or unexplained. It must agree with the scores: if no event has caused_move >= 0.4, "unexplained" should be the largest share.
 alert_holders: yes only if |move| >= 2% and a likely cause exists.
 reason: one plain line, max 18 words, no refs, no hedging words like "likely" repeated.
-explanation: at most 3 short sentences as ordered segments; each segment's text includes its own spacing and punctuation so that concatenating the segments reads correctly. Put each paraphrase of an event in its own segment with that event's ref; all other text has ref null. Write times as e.g. "Saturday 11:40 AM ET". Never print refs or brackets in the text.
-If the highest caused_move is below 0.4, the explanation must contain: "No clear catalyst — likely thin weekend trading or sector/macro drift." and mention the cross-asset context if given.
+explanation: at most 3 short sentences and at most 60 words in total, as ordered segments; each segment's text includes its own spacing and punctuation so that concatenating the segments reads correctly. Put each paraphrase of an event in its own segment with that event's ref; all other text has ref null. Write times as e.g. "Saturday 11:40 AM ET". Never print refs or brackets in the text.
+If the highest caused_move is below 0.4, the explanation must contain: "No clear catalyst — likely thin <session> trading or sector/macro drift." (use the session given) and mention the cross-asset context if given.
 If the move is below 0.5% in size, say it is a small move.`;
 
 function prompt(i: ScoreInput) {
@@ -29,7 +29,7 @@ function prompt(i: ScoreInput) {
     const t = new Date(e.time * 1000).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" });
     return `${e.ref} | ${e.kind} | ${t} ET | ${e.source} | ${e.text}`;
   });
-  return `Ticker ${i.ticker} (token ${i.token}). Window: ${i.windowLabel}.
+  return `Ticker ${i.ticker} (token ${i.token}). Session: ${i.session}. Window: ${i.windowLabel}.
 Move: ${move} (${i.refLabel}${i.fromPrice && i.toPrice ? `: $${i.fromPrice.toFixed(2)} → $${i.toPrice.toFixed(2)}` : ""}).
 Thin market (a $1,000 buy moves price > 1%): ${i.thin ? "yes" : "no"}.
 Cross-asset over the same window: ${i.cross}.
@@ -41,7 +41,7 @@ ${lines.join("\n") || "(none)"}`;
 export const claudeScorer: Scorer = {
   name: "Claude Haiku 4.5",
   async score(input) {
-    const client = new Anthropic();
+    const client = new Anthropic({ timeout: 60_000, maxRetries: 1 });
     const t0 = Date.now();
     const res = await client.messages.parse({
       model: MODEL,

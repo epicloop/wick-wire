@@ -31,8 +31,19 @@ const KEYWORDS: Record<Ticker, RegExp | null> = {
   MSFT: /microsoft|msft|azure|satya nadella|copilot|openai|xbox/i,
   AMZN: /amazon|amzn|aws|andy jassy|prime/i,
   META: /\bmeta\b|meta platforms|facebook|instagram|whatsapp|zuckerberg|llama/i,
-  SPY: null,
-  QQQ: null,
+  SPY: /s&p 500|s&p500|stock market|stocks|wall street|dow jones|\bdow\b|nasdaq|\bfed\b|federal reserve|treasur|inflation|futures|tariff|jobs report/i,
+  QQQ: /nasdaq|tech stocks|stock market|stocks|wall street|\bfed\b|federal reserve|treasur|inflation|futures|chip|semiconductor|magnificent seven/i,
+};
+
+const QUERY: Record<Ticker, string> = {
+  NVDA: "Nvidia stock",
+  TSLA: "Tesla stock",
+  AAPL: "Apple stock",
+  MSFT: "Microsoft stock",
+  AMZN: "Amazon stock",
+  META: "Meta Platforms stock",
+  SPY: "S&P 500 stocks",
+  QQQ: "Nasdaq stocks",
 };
 
 const NAMES: Record<Ticker, string> = {
@@ -56,7 +67,7 @@ export const STOCKS: Record<Ticker, Stock> = Object.fromEntries(
       ticker: t,
       token: `${t}x`,
       name: NAMES[t],
-      query: `${NAMES[t].replace(/ (Corp\.|Inc\.|ETF)$/, "")} stock`,
+      query: QUERY[t],
       keywords: KEYWORDS[t],
       mint: raw[t].mint.address,
       decimals: raw[t].mint.decimals,

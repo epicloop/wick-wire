@@ -1,5 +1,6 @@
 // prices → on-chain → news → score (one Claude call) → report. Cached so the LLM is never called per page view.
 import { createHash } from "node:crypto";
+import { unstable_cache } from "next/cache";
 import { cached } from "./cache";
 import { impact1k, prices as jupPrices } from "./jupiter";
 import { formatEt, marketClock } from "./market-hours";
@@ -10,13 +11,15 @@ import { getScorer } from "./scorer";
 import type { ScoreInputEvent, ScoreMeta, ScoreOutput } from "./scorer/types";
 import { stats, takeLlmBudget } from "./stats";
 import { CROSS, CROSS_LABEL, STOCKS, TICKERS, type Stock, type Ticker } from "./stocks";
-import type { BoardPayload, CrossRow, Flag, Mode, PricePoint, TickerReport, WireItem } from "./types";
+import { boardFrom } from "./board";
+import type { BoardPayload, CrossRow, Flag, Mode, PricePoint, TickerReport } from "./types";
 
 export const LIVE_TTL = 30 * 60_000;
 
 /** Everything the report needs, gathered either live or from history (replay script). */
 export type Gathered = {
   window: { from: number; to: number; label: string };
+  session: string;
   reference: PricePoint | null;
   tokenPrice: PricePoint | null;
   pools: Pool[];
@@ -92,7 +95,7 @@ async function gatherLive(stock: Stock): Promise<Gathered> {
     settle(fetchPools(stock), "DexScreener pools", miss),
     impact1k(stock.mint),
     fetchSupply(stock.mint),
-    settle(fetchHeadlines(stock.ticker, from, now, stock.keywords), "Finnhub news", miss),
+    settle(fetchHeadlines(stock.ticker, stock.query, from, now, stock.keywords), "news (Finnhub + Google News)", miss),
     crossAssets(from, null, miss),
   ]);
   const main = pools?.find((p) => !p.paired) ?? null;
@@ -105,6 +108,7 @@ async function gatherLive(stock: Stock): Promise<Gathered> {
 
   return {
     window: { from, to: now, label: windowLabel(from, now, open) },
+    session: { OPEN: "regular-session", "AFTER-HOURS": "after-hours", OVERNIGHT: "overnight", WEEKEND: "weekend" }[clock.state],
     reference,
     tokenPrice,
     pools: pools ?? [],
@@ -112,7 +116,7 @@ async function gatherLive(stock: Stock): Promise<Gathered> {
     trades,
     thin: thin ? { impactPct: thin.pct, route: thin.route } : null,
     supply,
-    headlines: headlines ?? [],
+    headlines: headlines?.items ?? [],
     cross,
     unavailable: miss,
   };
@@ -172,6 +176,7 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
     ticker: stock.ticker,
     token: stock.token,
     windowLabel: g.window.label,
+    session: g.session,
     movePct: gapPct,
     refLabel: g.reference ? `${stock.token} vs ${g.reference.label.toLowerCase()}` : "reference unavailable",
     fromPrice: refP,
@@ -252,40 +257,21 @@ export async function assemble(stock: Stock, g: Gathered, mode: Mode, opts: { fo
   };
 }
 
+async function buildLive(ticker: Ticker): Promise<TickerReport> {
+  return assemble(STOCKS[ticker], await gatherLive(STOCKS[ticker]), "live");
+}
+
+// Shared across serverless instances (Vercel Data Cache), so an LLM call is paid once per 30 min per ticker.
+const sharedLive = unstable_cache(buildLive, ["report-live-v1"], { revalidate: LIVE_TTL / 1000 });
+
 export async function liveReport(ticker: Ticker): Promise<TickerReport> {
-  return cached(`report:live:${ticker}`, LIVE_TTL, async () => assemble(STOCKS[ticker], await gatherLive(STOCKS[ticker]), "live"));
-}
-
-export function wireFrom(reports: TickerReport[]): WireItem[] {
-  return reports
-    .flatMap((r) => [
-      ...r.headlines.map((h) => ({ ticker: r.ticker, time: h.time, kind: "NEWS" as const, title: h.title, source: h.source, url: h.url, p: h.score?.caused_move ?? null })),
-      ...r.onchain.map((e) => ({ ticker: r.ticker, time: e.time, kind: "ON-CHAIN" as const, title: e.title, source: e.detail, url: e.link, p: e.score?.caused_move ?? null })),
-    ])
-    .filter((w) => w.p == null || w.p >= 0.05)
-    .sort((a, b) => b.time - a.time)
-    .slice(0, 30);
-}
-
-export function boardFrom(reports: TickerReport[], mode: Mode, market: BoardPayload["market"], replayLabel: string | null): BoardPayload {
-  const scored = reports.filter((r) => r.scorer);
-  const lat = scored.map((r) => r.scorer!.latencyMs).sort((a, b) => a - b);
-  return {
-    mode,
-    generatedAt: Date.now(),
-    market,
-    replayLabel,
-    reports,
-    wire: wireFrom(reports),
-    stats: {
-      headlines: reports.reduce((s, r) => s + r.headlines.length, 0),
-      onchainEvents: reports.reduce((s, r) => s + r.onchain.length, 0),
-      llmCalls: scored.length,
-      llmCostUsd: scored.reduce((s, r) => s + r.scorer!.costUsd, 0),
-      p50Ms: lat.length ? lat[Math.floor(lat.length / 2)] : null,
-      scorer: scored[0]?.scorer?.name ?? "Claude Haiku 4.5",
-    },
-  };
+  return cached(`report:live:${ticker}`, LIVE_TTL, async () => {
+    try {
+      return await sharedLive(ticker);
+    } catch {
+      return buildLive(ticker); // outside Next (scripts) unstable_cache is unavailable
+    }
+  });
 }
 
 export async function liveBoard(): Promise<BoardPayload> {
